@@ -1,4 +1,4 @@
--- 1. Courses (修正：加入 module_presentation_length)
+-- 1. 建立 Courses (核心表)
 CREATE TABLE courses (
     code_module VARCHAR(45),
     code_presentation VARCHAR(45),
@@ -6,19 +6,19 @@ CREATE TABLE courses (
     PRIMARY KEY (code_module, code_presentation)
 );
 
--- 2. Assessments (順序符合 CSV)
+-- 2. 建立 Assessments (評量表)
 CREATE TABLE assessments (
     code_module VARCHAR(45),
     code_presentation VARCHAR(45),
     id_assessment INTEGER,
     assessment_type VARCHAR(45),
     date INTEGER,
-    weight INTEGER,
+    weight FLOAT, 
     PRIMARY KEY (id_assessment),
     FOREIGN KEY (code_module, code_presentation) REFERENCES courses(code_module, code_presentation)
 );
 
--- 3. Vle (順序符合 CSV)
+-- 3. 建立 Vle (教材表)
 CREATE TABLE vle (
     id_site INTEGER,
     code_module VARCHAR(45),
@@ -30,13 +30,13 @@ CREATE TABLE vle (
     FOREIGN KEY (code_module, code_presentation) REFERENCES courses(code_module, code_presentation)
 );
 
--- 4. StudentInfo (修正：欄位順序調整以符合 CSV)
+-- 4. 建立 StudentInfo (學生資訊表)
 CREATE TABLE studentInfo (
     code_module VARCHAR(45),
     code_presentation VARCHAR(45),
     id_student INTEGER,
     gender VARCHAR(10),
-    region VARCHAR(45),           -- 注意：region 通常在 gender 後面
+    region VARCHAR(45),
     highest_education VARCHAR(45),
     imd_band VARCHAR(20),
     age_band VARCHAR(20),
@@ -48,7 +48,7 @@ CREATE TABLE studentInfo (
     FOREIGN KEY (code_module, code_presentation) REFERENCES courses(code_module, code_presentation)
 );
 
--- 5. StudentRegistration (順序符合 CSV)
+-- 5. 建立 StudentRegistration (學生註冊表)
 CREATE TABLE studentRegistration (
     code_module VARCHAR(45),
     code_presentation VARCHAR(45),
@@ -59,8 +59,7 @@ CREATE TABLE studentRegistration (
     FOREIGN KEY (code_module, code_presentation, id_student) REFERENCES studentInfo(code_module, code_presentation, id_student)
 );
 
--- 6. StudentAssessment (修正：id_assessment 通常在 CSV 第一欄，但為了保險我們讓它寬容一點，如果報錯我們再調)
--- 備註：標準 CSV 順序通常是 id_student 在前，如果不對我們等下看錯誤訊息
+-- 6. 建立 StudentAssessment (學生評量成績表)
 CREATE TABLE studentAssessment (
     id_student INTEGER,
     id_assessment INTEGER,
@@ -71,7 +70,7 @@ CREATE TABLE studentAssessment (
     FOREIGN KEY (id_assessment) REFERENCES assessments(id_assessment)
 );
 
--- 7. StudentVle (順序符合 CSV)
+-- 7. 建立 StudentVle (學生互動紀錄表)
 CREATE TABLE studentVle (
     code_module VARCHAR(45),
     code_presentation VARCHAR(45),

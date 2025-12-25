@@ -1,7 +1,0 @@
-\copy assessments FROM 'C:\Users\wuni1\Downloads\OULAD\assessments.csv' WITH (FORMAT CSV, HEADER, QUOTE '"', NULL '', FORCE_NULL(date), ENCODING 'UTF8');
-\copy courses FROM 'C:\Users\wuni1\Downloads\OULAD\courses.csv' WITH (FORMAT CSV, HEADER, QUOTE '"', ENCODING 'UTF8');
-\copy vle FROM 'C:\Users\wuni1\Downloads\OULAD\vle.csv' WITH (FORMAT CSV, HEADER, QUOTE '"', NULL '', FORCE_NULL(week_from, week_to), ENCODING 'UTF8');
-\copy studentInfo FROM 'C:\Users\wuni1\Downloads\OULAD\studentInfo.csv' WITH (FORMAT CSV, HEADER, QUOTE '"', ENCODING 'UTF8');
-\copy studentRegistration FROM 'C:\Users\wuni1\Downloads\OULAD\studentRegistration.csv' WITH (FORMAT CSV, HEADER, QUOTE '"', NULL '', FORCE_NULL(date_registration, date_unregistration), ENCODING 'UTF8');
-\copy studentAssessment FROM 'C:\Users\wuni1\Downloads\OULAD\studentAssessment.csv' WITH (FORMAT CSV, HEADER, QUOTE '"', NULL '', FORCE_NULL(score), ENCODING 'UTF8');
-\copy studentVle FROM 'C:\Users\wuni1\Downloads\OULAD\studentVle.csv' WITH (FORMAT CSV, HEADER, QUOTE '"', ENCODING 'UTF8');

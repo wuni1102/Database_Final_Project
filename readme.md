@@ -4,11 +4,13 @@ YourProject/
 ├── .gitignore
 ├── init.sql
 ├── import.py
+├── connect.py
+├── dropAll.sql
 └── data/
     ├── student_info.csv
     ├── courses.csv
     └── ... (其餘 5 個 CSV)
-    注意csv檔案的檔名要改成lower camel case
+    注意csv檔案的檔名要改成lower camel case，data資料夾、.env要自己新增
 
 建構資料庫：
 1. 連線到sql database

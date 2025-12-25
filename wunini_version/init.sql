@@ -70,7 +70,7 @@ CREATE TABLE student_vle (
     id_site INT,
     date INT,
     sum_click INT,
-    PRIMARY KEY (id_student, id_site, code_module, code_presentation), -- 考慮到學生跨課行為，加入課程資訊
+    PRIMARY KEY (id_student, id_site, code_module, code_presentation, date), -- 考慮到學生跨課行為，加入課程資訊
     -- 外鍵必須對應 student_info 的複合主鍵
     FOREIGN KEY (id_student, code_module, code_presentation) REFERENCES student_info(id_student, code_module, code_presentation),
     FOREIGN KEY (id_site) REFERENCES vle(id_site)
@@ -91,6 +91,5 @@ CREATE TABLE student_assessment (
     -- 按照目前最嚴謹的架構，建議如下：
     code_module VARCHAR(45),
     code_presentation VARCHAR(45),
-    FOREIGN KEY (id_student, code_module, code_presentation) REFERENCES student_info(id_student, code_module, code_presentation),
     FOREIGN KEY (id_assessment) REFERENCES assessments(id_assessment)
 );

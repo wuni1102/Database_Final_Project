@@ -62,16 +62,80 @@ def import_csv_data():
                     df.to_sql(table_name, engine, if_exists="append", index=False)
                     # print(f"✅ {table_name} 匯入成功 (共 {len(df)} 筆)")
                 
-                elif table_name == "student_assessment":
-                    # 核心邏輯：透過 Left Join 補全 code_module 與 code_presentation
-                    df = pd.merge(df, df_assess_bridge, on='id_assessment', how='left')
+                elif table_name == "assessments":
+                    df = pd.read_csv(file_path)
+
                     output = io.StringIO()
-                    # na_rep='' 確保輸出的流中，原本是空值的地方變成不帶引號的空位
-                    df.to_csv(output, index=False, header=False, na_rep='') 
+                    df.to_csv(output, index=False, header=False, na_rep='')
                     output.seek(0)
-                    
-                    sql = f"COPY {table_name} FROM STDIN WITH (FORMAT CSV, NULL '')"
+
+                    sql = """
+                    COPY assessments (
+                        code_module,
+                        code_presentation,
+                        id_assessment,
+                        assessment_type,
+                        date,
+                        weight
+                    )
+                    FROM STDIN
+                    WITH (FORMAT CSV, NULL '')
+                    """
                     cursor.copy_expert(sql, output)
+
+                
+                elif table_name == "student_assessment":
+                    df = pd.read_csv(file_path)
+
+                    # 補 code_module / code_presentation
+                    df = pd.merge(
+                        df,
+                        df_assess_bridge,
+                        on="id_assessment",
+                        how="left"
+                    )
+
+                    output = io.StringIO()
+                    df.to_csv(output, index=False, header=False, na_rep='')
+                    output.seek(0)
+
+                    sql = f"""
+                    COPY student_assessment
+                    FROM STDIN
+                    WITH (FORMAT CSV, NULL '')
+                    """
+                    cursor.copy_expert(sql, output)
+
+                elif table_name == "student_vle":
+                    df = pd.read_csv(file_path)
+
+                    df = (
+                        df.groupby(
+                            ["id_student", "id_site", "code_module", "code_presentation", "date"],
+                            as_index=False
+                        )["sum_click"]
+                        .sum()
+                    )
+
+                    output = io.StringIO()
+                    df.to_csv(output, index=False, header=False, na_rep='')
+                    output.seek(0)
+
+                    sql = """
+                    COPY student_vle (
+                        id_student,
+                        id_site,
+                        code_module,
+                        code_presentation,
+                        date,
+                        sum_click
+                    )
+                    FROM STDIN
+                    WITH (FORMAT CSV, NULL '')
+                    """
+
+                    cursor.copy_expert(sql, output)
+                
                 else:
                     # 讀取時將空字串與引號內的空值都視為 NaN
                     df = pd.read_csv(file_path, keep_default_na=True, na_values=[''])

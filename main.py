@@ -16,7 +16,7 @@ def get_db_connection():
     try:
         return psycopg2.connect(
             host="localhost",
-            database="final_project", # 請確認您的資料庫名稱
+            database="final_project", # 請確認這是您最後成功的資料庫名稱
             user="postgres",
             password=os.getenv("PASSWORD")
         )
@@ -32,7 +32,15 @@ class Course(BaseModel):
     presentation_month: str
     module_presentation_length: int
 
-# 1. 取得所有課程 (支援排序)
+# ✅ 更新專用的模型：包含所有欄位
+class UpdateItem(BaseModel):
+    code_module: str
+    code_presentation: str
+    presentation_year: int
+    presentation_month: str
+    module_presentation_length: int
+
+# 1. 取得所有課程
 @app.get("/courses")
 def get_courses(sort_by: str = "code_module", order: str = "ASC"):
     conn = get_db_connection()
@@ -40,7 +48,6 @@ def get_courses(sort_by: str = "code_module", order: str = "ASC"):
     
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
-    # ⚠️ 為了安全，限制只能針對特定欄位排序
     allowed_sorts = ["code_module", "presentation_year", "module_presentation_length"]
     if sort_by not in allowed_sorts: sort_by = "code_module"
     if order not in ["ASC", "DESC"]: order = "ASC"
@@ -72,30 +79,61 @@ def create_course(course: Course):
         conn.close()
     return {"message": "新增成功"}
 
-# 3. 更新課程長度
+# 3. 更新課程 (✅ 修改版：可以更新所有欄位)
 @app.put("/courses/{code}/{sem}")
-def update_course(code: str, sem: str, length: int):
+def update_course(code: str, sem: str, item: UpdateItem):
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("""
-        UPDATE courses 
-        SET module_presentation_length = %s 
-        WHERE code_module = %s AND code_presentation = %s
-    """, (length, code, sem))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return {"message": "更新成功"}
+    try:
+        # 這裡會用 item 裡的新資料，去覆寫原本(code, sem) 的資料
+        cur.execute("""
+            UPDATE courses 
+            SET code_module = %s,
+                code_presentation = %s,
+                presentation_year = %s,
+                presentation_month = %s,
+                module_presentation_length = %s
+            WHERE code_module = %s AND code_presentation = %s
+        """, (
+            item.code_module, 
+            item.code_presentation, 
+            item.presentation_year, 
+            item.presentation_month, 
+            item.module_presentation_length,
+            code, # WHERE 條件：舊代碼
+            sem   # WHERE 條件：舊學期
+        ))
+        conn.commit()
+        
+        if cur.rowcount == 0:
+            return {"message": "找不到該課程或資料未變動", "status": "failed"}
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Update Error: {e}")
+        # 如果因為改了代碼導致和其他表格 (FK) 衝突，會回傳 400
+        raise HTTPException(status_code=400, detail=f"更新失敗: {e}")
+    finally:
+        cur.close()
+        conn.close()
+        
+    return {"message": "更新成功", "status": "success"}
 
 # 4. 刪除課程
 @app.delete("/courses/{code}/{sem}")
 def delete_course(code: str, sem: str):
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("DELETE FROM courses WHERE code_module = %s AND code_presentation = %s", (code, sem))
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        cur.execute("DELETE FROM courses WHERE code_module = %s AND code_presentation = %s", (code, sem))
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print(f"Delete Error: {e}")
+        raise HTTPException(status_code=400, detail=f"刪除失敗 (可能有關聯資料): {e}")
+    finally:
+        cur.close()
+        conn.close()
     return {"message": "刪除成功"}
 
 # 掛載靜態檔案

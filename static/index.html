@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>課程管理系統</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light p-4">
+
+    <div class="container bg-white p-4 rounded shadow">
+        <h2 class="mb-4 text-center">📚 課程管理系統 (Courses)</h2>
+
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">新增課程</div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-md-2">
+                        <input type="text" id="newCode" class="form-control" placeholder="代碼 (AAA)">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" id="newSem" class="form-control" placeholder="學期 (2019J)">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" id="newYear" class="form-control" placeholder="年份">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" id="newMonth" class="form-control" placeholder="月份 (February)">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="number" id="newLen" class="form-control" placeholder="長度 (天)">
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-success w-100" onclick="createCourse()">➕ 新增</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between mb-3 align-items-center">
+            <h4>課程列表</h4>
+            <div class="d-flex gap-2">
+                <select id="sortSelect" class="form-select" onchange="fetchCourses()">
+                    <option value="code_module">按 代碼 排序</option>
+                    <option value="presentation_year">按 年份 排序</option>
+                    <option value="module_presentation_length">按 長度 排序</option>
+                </select>
+                <select id="orderSelect" class="form-select" onchange="fetchCourses()">
+                    <option value="ASC">升冪 (A-Z)</option>
+                    <option value="DESC">降冪 (Z-A)</option>
+                </select>
+            </div>
+        </div>
+
+        <table class="table table-striped table-hover table-bordered text-center align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>課程代碼</th>
+                    <th>學期代碼</th>
+                    <th>年份</th>
+                    <th>月份</th>
+                    <th>課程長度 (天)</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="course-table-body">
+                </tbody>
+        </table>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

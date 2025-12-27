@@ -37,10 +37,15 @@ class UpdatePayload(BaseModel):
 class CreatePayload(BaseModel):
     data: Dict[str, Any]
 
-# 1. 取得所有表格名稱
+# ==========================================
+# 1. 取得所有表格名稱 (已修改：加入過濾功能)
+# ==========================================
 @app.get("/api/tables")
 def get_tables():
     conn = get_db_connection()
+    if not conn:
+        return []
+        
     cur = conn.cursor()
     # 查詢 public schema 下的所有 base table
     cur.execute("""
@@ -50,10 +55,20 @@ def get_tables():
         AND table_type = 'BASE TABLE'
         ORDER BY table_name;
     """)
-    tables = [row[0] for row in cur.fetchall()]
+    all_tables = [row[0] for row in cur.fetchall()]
+    
     cur.close()
     conn.close()
-    return tables
+
+    # --- 🚀 修改重點：定義要「無視」的表格清單 ---
+    # 如果未來有任何表格不想顯示在網頁上，加進這個列表即可
+    # 例如: exclude_list = ['secret_table', 'backup_table']
+    exclude_list = ['sqlite_sequence'] # 雖然 Postgres 沒有這個，但留著結構方便你以後加別的
+
+    # 過濾表格
+    real_tables = [t for t in all_tables if t not in exclude_list]
+
+    return real_tables
 
 # 2. 取得指定表格的欄位資訊 (包含是否為 PK)
 @app.get("/api/columns/{table_name}")

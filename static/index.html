@@ -11,9 +11,9 @@
         .table input.form-control { 
             font-size: 0.9rem; padding: 0.25rem; min-width: 100px;
         }
-        /* 讓表頭變成可點擊的樣子 */
         th.sortable { cursor: pointer; user-select: none; }
         th.sortable:hover { background-color: #495057; color: #fff; }
+        .pagination-info { font-weight: bold; margin: 0 15px; }
     </style>
 </head>
 <body>
@@ -44,26 +44,41 @@
     <div class="table-container">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h4 id="tableTitle">資料列表</h4>
-            <span class="text-muted small">💡 點擊標題可排序，修改輸入框後點擊「更新」</span>
+            <div class="d-flex align-items-center">
+                <button class="btn btn-outline-secondary btn-sm" onclick="changePage(-1)" id="btnPrev">◀ 上一頁</button>
+                <span class="pagination-info" id="pageInfo">第 1 頁 / 共 1 頁</span>
+                <button class="btn btn-outline-secondary btn-sm" onclick="changePage(1)" id="btnNext">下一頁 ▶</button>
+                
+                <select class="form-select form-select-sm ms-3" style="width: auto;" id="limitSelector" onchange="changeLimit()">
+                    <option value="20">每頁 20 筆</option>
+                    <option value="50">每頁 50 筆</option>
+                    <option value="100" selected>每頁 100 筆</option>
+                </select>
+            </div>
         </div>
         
         <table class="table table-bordered table-hover align-middle text-center">
             <thead class="table-dark" id="tableHead">
-                </thead>
+            </thead>
             <tbody id="tableBody">
-                </tbody>
+            </tbody>
         </table>
+        <div id="loadingText" class="text-center text-muted my-3" style="display:none;">載入中...</div>
     </div>
 </div>
 
 <script>
     let currentTable = "";
-    let currentColumns = []; // 儲存目前的欄位名稱 ['id', 'name', ...]
+    let currentColumns = [];
     let currentSort = { col: "", order: "ASC" };
+    
+    // 🚀 修改：預設 limit 改成 100
+    let currentPage = 1;
+    let limit = 100; 
+    let totalPages = 1;
 
     document.addEventListener("DOMContentLoaded", init);
 
-    // 1. 初始化：抓取所有表格名稱
     async function init() {
         try {
             const res = await fetch("/api/tables");
@@ -78,7 +93,6 @@
                 selector.appendChild(opt);
             });
 
-            // 預設選取第一個表格並載入
             if (tables.length > 0) {
                 selector.value = tables[0];
                 switchTable();
@@ -88,38 +102,52 @@
         }
     }
 
-    // 2. 切換表格：載入欄位結構 + 載入資料
     async function switchTable() {
         currentTable = document.getElementById("tableSelector").value;
         document.getElementById("tableTitle").innerText = `資料表：${currentTable}`;
         document.getElementById("btnAdd").disabled = false;
         
-        // 重置排序
         currentSort = { col: "", order: "ASC" };
+        currentPage = 1;
 
-        // 取得該表格的欄位結構
         const colRes = await fetch(`/api/columns/${currentTable}`);
         const colsData = await colRes.json();
         currentColumns = colsData.map(c => c.column_name);
 
-        // 重繪「新增資料」的表單
         renderCreateForm();
-
-        // 載入資料
         loadData();
     }
 
-    // 3. 載入並渲染資料 (含排序)
     async function loadData() {
-        let url = `/api/data/${currentTable}`;
+        document.getElementById("loadingText").style.display = "block";
+        document.getElementById("tableBody").innerHTML = "";
+
+        let url = `/api/data/${currentTable}?page=${currentPage}&limit=${limit}`;
         if (currentSort.col) {
-            url += `?sort_by=${currentSort.col}&order=${currentSort.order}`;
+            url += `&sort_by=${currentSort.col}&order=${currentSort.order}`;
         }
 
-        const res = await fetch(url);
-        const rows = await res.json();
+        try {
+            const res = await fetch(url);
+            const result = await res.json();
+            
+            const rows = result.data;
+            const pagination = result.pagination;
 
-        // --- 繪製表頭 (Thead) ---
+            totalPages = pagination.total_pages;
+            updatePaginationUI(pagination);
+
+            renderTable(rows);
+
+        } catch(e) {
+            console.error(e);
+            alert("資料載入失敗");
+        } finally {
+            document.getElementById("loadingText").style.display = "none";
+        }
+    }
+
+    function renderTable(rows) {
         const thead = document.getElementById("tableHead");
         thead.innerHTML = "";
         let headRow = "<tr>";
@@ -133,20 +161,20 @@
         headRow += "<th>操作</th></tr>";
         thead.innerHTML = headRow;
 
-        // --- 繪製內容 (Tbody) ---
         const tbody = document.getElementById("tableBody");
         tbody.innerHTML = "";
 
-        rows.forEach((row, index) => {
-            // 我們把「原始資料」存成 JSON 字串放在 data-original 屬性裡
-            // 這樣更新的時候，才能知道舊的值是什麼，以便 WHERE 定位
+        if (rows.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="${currentColumns.length + 1}" class="text-muted">沒有資料</td></tr>`;
+            return;
+        }
+
+        rows.forEach((row) => {
             const originalJson = JSON.stringify(row).replace(/"/g, '&quot;');
-            
             let tr = `<tr data-original="${originalJson}">`;
             
             currentColumns.forEach(col => {
                 const val = row[col] !== null ? row[col] : "";
-                // 每個輸入框給一個 class 用於抓取
                 tr += `<td><input type="text" class="form-control row-input" data-col="${col}" value="${val}"></td>`;
             });
 
@@ -161,10 +189,30 @@
         });
     }
 
-    // 4. 設定排序
+    function updatePaginationUI(pagination) {
+        // 顯示目前的總數 (最多 1000)
+        document.getElementById("pageInfo").innerText = `第 ${pagination.current_page} 頁 / 共 ${pagination.total_pages} 頁 (總計 ${pagination.total_count} 筆)`;
+        
+        document.getElementById("btnPrev").disabled = (pagination.current_page <= 1);
+        document.getElementById("btnNext").disabled = (pagination.current_page >= pagination.total_pages);
+    }
+
+    function changePage(delta) {
+        const newPage = currentPage + delta;
+        if (newPage > 0 && newPage <= totalPages) {
+            currentPage = newPage;
+            loadData();
+        }
+    }
+
+    function changeLimit() {
+        limit = parseInt(document.getElementById("limitSelector").value);
+        currentPage = 1;
+        loadData();
+    }
+
     function setSort(col) {
         if (currentSort.col === col) {
-            // 切換 ASC / DESC
             currentSort.order = currentSort.order === "ASC" ? "DESC" : "ASC";
         } else {
             currentSort.col = col;
@@ -173,11 +221,9 @@
         loadData();
     }
 
-    // 5. 動態產生「新增資料」的輸入框
     function renderCreateForm() {
         const container = document.getElementById("createFormContainer");
         container.innerHTML = "";
-        
         currentColumns.forEach(col => {
             const div = document.createElement("div");
             div.className = "col-md-2";
@@ -189,12 +235,11 @@
         });
     }
 
-    // 6. 新增資料 API
     async function createData() {
         const payload = {};
         currentColumns.forEach(col => {
             const val = document.getElementById(`new-${col}`).value;
-            if (val) payload[col] = val; // 只傳送有填的值
+            if (val) payload[col] = val;
         });
 
         try {
@@ -208,7 +253,6 @@
             if (res.ok) {
                 alert("✅ 新增成功");
                 loadData();
-                // 清空輸入框
                 document.querySelectorAll("#createFormContainer input").forEach(i => i.value = "");
             } else {
                 alert("❌ 新增失敗：" + result.detail);
@@ -216,14 +260,9 @@
         } catch (e) { alert("連線錯誤"); }
     }
 
-    // 7. 更新資料 API
     async function updateRow(btn) {
         const tr = btn.closest("tr");
-        
-        // 取得舊資料 (為了 WHERE 條件)
         const originalData = JSON.parse(tr.getAttribute("data-original"));
-        
-        // 取得新資料 (從輸入框讀取)
         const newData = {};
         const inputs = tr.querySelectorAll(".row-input");
         inputs.forEach(input => {
@@ -243,31 +282,26 @@
                 body: JSON.stringify(payload)
             });
             const result = await res.json();
-            
             if (res.ok) {
                 alert("✅ 更新成功");
-                loadData(); // 重新整理以確保資料一致
+                loadData();
             } else {
                 alert("❌ 更新失敗：" + result.detail);
             }
         } catch (e) { alert("連線錯誤"); }
     }
 
-    // 8. 刪除資料 API
     async function deleteRow(btn) {
         if (!confirm("確定要刪除這筆資料嗎？")) return;
-        
         const tr = btn.closest("tr");
         const originalData = JSON.parse(tr.getAttribute("data-original"));
 
         try {
-            // 這裡用 POST 搭配 /delete 路徑，因為 DELETE method 帶 body 有些瀏覽器支援度不一
             const res = await fetch(`/api/data/${currentTable}/delete`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ data: originalData })
             });
-            
             if (res.ok) {
                 alert("🗑️ 刪除成功");
                 loadData();

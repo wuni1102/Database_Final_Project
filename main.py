@@ -12,7 +12,10 @@ import datetime
 
 load_dotenv()
 
-app = FastAPI()
+# ==========================================
+# 🚀 修改重點：設定 API 文件的標題
+# ==========================================
+app = FastAPI(title="成績計算與管理系統", description="用於管理成績資料庫的後端 API")
 
 # 資料庫連線
 def get_db_connection():
@@ -28,18 +31,16 @@ def get_db_connection():
         print("DB Connection Error:", e)
         return None
 
-# 通用的更新模型 (接收兩部分：要修改成的新資料 data，以及用來定位舊資料的條件 conditions)
+# 通用的更新模型
 class UpdatePayload(BaseModel):
-    data: Dict[str, Any]      # SET 欄位 = 值
-    conditions: Dict[str, Any] # WHERE 欄位 = 值 (原本的舊資料)
+    data: Dict[str, Any]      
+    conditions: Dict[str, Any] 
 
 # 通用的新增模型
 class CreatePayload(BaseModel):
     data: Dict[str, Any]
 
-# ==========================================
-# 1. 取得所有表格名稱 (已修改：加入過濾功能)
-# ==========================================
+# 1. 取得所有表格名稱 (已加入過濾清單)
 @app.get("/api/tables")
 def get_tables():
     conn = get_db_connection()
@@ -60,24 +61,20 @@ def get_tables():
     cur.close()
     conn.close()
 
-    # --- 🚀 修改重點：定義要「無視」的表格清單 ---
-    # 如果未來有任何表格不想顯示在網頁上，加進這個列表即可
-    # 例如: exclude_list = ['secret_table', 'backup_table']
-    exclude_list = ['sqlite_sequence'] # 雖然 Postgres 沒有這個，但留著結構方便你以後加別的
+    # 定義要「無視」的表格清單
+    exclude_list = ['sqlite_sequence'] 
 
     # 過濾表格
     real_tables = [t for t in all_tables if t not in exclude_list]
 
     return real_tables
 
-# 2. 取得指定表格的欄位資訊 (包含是否為 PK)
+# 2. 取得指定表格的欄位資訊
 @app.get("/api/columns/{table_name}")
 def get_columns(table_name: str):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
-    # 這裡很關鍵：我們需要知道欄位名稱、型別，以及它是否是主鍵(PK)
-    # 為了簡化，我們先只抓欄位名稱
     query = sql.SQL("""
         SELECT column_name, data_type 
         FROM information_schema.columns 
@@ -91,22 +88,20 @@ def get_columns(table_name: str):
     conn.close()
     return columns
 
-# 3. 取得表格資料 (支援動態排序)
+# 3. 取得表格資料
 @app.get("/api/data/{table_name}")
 def get_data(table_name: str, sort_by: Optional[str] = None, order: str = "ASC"):
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
-    # 安全地構建 SQL 查詢
     query_parts = [sql.SQL("SELECT * FROM {}").format(sql.Identifier(table_name))]
     
     if sort_by:
-        # 決定升序或降序
         order_sql = sql.SQL("DESC") if order.upper() == "DESC" else sql.SQL("ASC")
         query_parts.append(sql.SQL("ORDER BY {}").format(sql.Identifier(sort_by)))
         query_parts.append(order_sql)
     
-    query_parts.append(sql.SQL("LIMIT 100")) # 限制 100 筆避免網頁卡死
+    query_parts.append(sql.SQL("LIMIT 100"))
     
     final_query = sql.SQL(" ").join(query_parts)
     
@@ -114,7 +109,6 @@ def get_data(table_name: str, sort_by: Optional[str] = None, order: str = "ASC")
         cur.execute(final_query)
         rows = cur.fetchall()
         
-        # 處理日期物件，轉成字串以免前端看不懂
         for row in rows:
             for key, value in row.items():
                 if isinstance(value, (datetime.date, datetime.datetime)):
@@ -139,7 +133,6 @@ def create_data(table_name: str, payload: CreatePayload):
     values = list(data.values())
     
     try:
-        # 動態產生 INSERT INTO table (col1, col2) VALUES (%s, %s)
         query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
             sql.Identifier(table_name),
             sql.SQL(', ').join(map(sql.Identifier, columns)),
@@ -155,26 +148,24 @@ def create_data(table_name: str, payload: CreatePayload):
         conn.close()
     return {"message": "新增成功"}
 
-# 5. 通用更新功能 (最複雜的部分)
+# 5. 通用更新功能
 @app.put("/api/data/{table_name}")
 def update_data(table_name: str, payload: UpdatePayload):
     conn = get_db_connection()
     cur = conn.cursor()
     
-    new_data = payload.data       # 要改成的新值
-    conditions = payload.conditions # 舊的值 (用來找原本是哪一行)
+    new_data = payload.data      
+    conditions = payload.conditions 
     
     if not conditions:
         raise HTTPException(status_code=400, detail="無法更新：找不到原始資料對應條件")
 
     try:
-        # 構建 SET 子句 (col1 = %s, col2 = %s)
         set_clause = sql.SQL(', ').join(
             sql.Composed([sql.Identifier(k), sql.SQL(" = "), sql.Placeholder()])
             for k in new_data.keys()
         )
         
-        # 構建 WHERE 子句 (col1 = %s AND col2 = %s) 用舊資料鎖定行
         where_clause = sql.SQL(' AND ').join(
             sql.Composed([sql.Identifier(k), sql.SQL(" = "), sql.Placeholder()])
             for k in conditions.keys()
@@ -186,7 +177,6 @@ def update_data(table_name: str, payload: UpdatePayload):
             where_clause
         )
         
-        # 參數順序：SET 的值 + WHERE 的值
         params = list(new_data.values()) + list(conditions.values())
         
         cur.execute(query, params)
@@ -204,12 +194,12 @@ def update_data(table_name: str, payload: UpdatePayload):
     return {"message": "更新成功"}
 
 # 6. 通用刪除功能
-@app.post("/api/data/{table_name}/delete") # 這裡用 POST 比較方便傳 JSON body
-def delete_data(table_name: str, payload: CreatePayload): # 借用 CreatePayload 因為結構一樣只傳 data
+@app.post("/api/data/{table_name}/delete")
+def delete_data(table_name: str, payload: CreatePayload):
     conn = get_db_connection()
     cur = conn.cursor()
     
-    conditions = payload.data # 這裡是傳入 "要刪除的那一行的所有資料" 作為條件
+    conditions = payload.data
     
     try:
         where_clause = sql.SQL(' AND ').join(
